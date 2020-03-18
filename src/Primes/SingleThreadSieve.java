@@ -30,8 +30,9 @@ public class SingleThreadSieve {
         }
         Arrays.stream(numbers).forEach(i -> {
             if(i!=-1)
-                System.out.print(i+", ");
+                System.out.print(i+" ");
         });
+        System.out.println();
     }
 
     public static void run(int num){
