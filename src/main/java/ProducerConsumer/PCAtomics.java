@@ -15,7 +15,7 @@ public class PCAtomics {
     private boolean print;
 
     public PCAtomics(int producerCount, int consumerCount, int bufferSize, int itemCount, long sleepDelay, boolean print){
-        items = new LinkedBlockingQueue<>(bufferSize);
+        items = new LinkedBlockingQueue(bufferSize);
         this.bufferSize = bufferSize;
 
         Producer[] producers = new Producer[producerCount];

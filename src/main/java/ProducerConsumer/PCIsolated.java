@@ -8,21 +8,17 @@ import java.util.concurrent.locks.ReentrantLock;
 
 public class PCIsolated {
     private Queue<Item> items;
-    private Lock lock;
-    private Condition full, empty;
     private int bufferSize;
     private volatile boolean producing;
     private boolean print;
 
     public PCIsolated(int producerCount, int consumerCount, int bufferSize, int itemCount, long sleepDelay, boolean print){
         items = new LinkedList<>();
-        lock = new ReentrantLock();
-        full = lock.newCondition();
-        empty = lock.newCondition();
         this.bufferSize = bufferSize;
 
         Producer[] producers = new Producer[producerCount];
         Consumer[] consumers = new Consumer[consumerCount];
+        this.print = print;
 
         producing = true;
 
@@ -51,29 +47,25 @@ public class PCIsolated {
             System.out.println("Finished");
     }
 
-    public void add(Item item) throws InterruptedException {
-        lock.lock();
+    public synchronized void add(Item item) throws InterruptedException {
         while(bufferSize <= items.size()) {
-            full.await();
+            wait();
         }
         items.add(item);
-        empty.signal();
-        lock.unlock();
+        notifyAll();
     }
 
-    public Item remove() throws InterruptedException {
+    public synchronized Item remove() throws InterruptedException {
         Item item = null;
-        lock.lock();
         while (items.isEmpty()) {
             if(!producing) {
-                lock.unlock();
+                notifyAll();
                 return null;
             }
-            empty.await();
+            wait();
         }
         item = items.remove();
-        full.signal();
-        lock.unlock();
+        notifyAll();
         return item;
     }
 
@@ -100,7 +92,8 @@ public class PCIsolated {
                     if(print)
                         System.out.println("Consumed "+item);
                 }
-                System.out.println("Finished Consumer");
+                if(print)
+                    System.out.println("Finished Consumer");
 
             } catch (InterruptedException e) {
                 e.printStackTrace();
@@ -128,7 +121,8 @@ public class PCIsolated {
                     if(print)
                         System.out.println("Made "+item);
                 }
-                System.out.println("Finished producer "+id);
+                if(print)
+                    System.out.println("Finished producer "+id);
             } catch (InterruptedException e) {
                 e.printStackTrace();
             }
