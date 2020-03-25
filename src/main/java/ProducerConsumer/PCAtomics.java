@@ -1,22 +1,25 @@
 package ProducerConsumer;
 
-import java.util.LinkedList;
-import java.util.Queue;
-import java.util.concurrent.BlockingQueue;
-import java.util.concurrent.LinkedBlockingQueue;
-import java.util.concurrent.locks.Condition;
-import java.util.concurrent.locks.Lock;
-import java.util.concurrent.locks.ReentrantLock;
+import java.util.concurrent.atomic.AtomicReferenceArray;
 
 public class PCAtomics {
-    private BlockingQueue<Item> items;
-    private int bufferSize;
+    private AtomicReferenceArray<Item> items;
     private volatile boolean producing;
     private boolean print;
 
-    public PCAtomics(int producerCount, int consumerCount, int bufferSize, int itemCount, long sleepDelay, boolean print){
-        items = new LinkedBlockingQueue(bufferSize);
-        this.bufferSize = bufferSize;
+    /**
+     * Runs and creates a new producer consumer system with atomics.
+     *
+     * @param producerCount The number of producers in the system.
+     * @param consumerCount The number of consumers in the system.
+     * @param bufferSize    The limiting size of the buffer.
+     * @param itemCount     The number of items each producer should make.
+     * @param sleepDelay    How many ms the consumers should sleep for between consuming items.
+     * @param print         Whether to print what the system is doing.
+     */
+    public PCAtomics(int producerCount, int consumerCount, int bufferSize, int itemCount, long sleepDelay, boolean print) {
+        items = new AtomicReferenceArray<>(bufferSize);
+
 
         Producer[] producers = new Producer[producerCount];
         Consumer[] consumers = new Consumer[consumerCount];
@@ -25,11 +28,11 @@ public class PCAtomics {
 
         producing = true;
 
-        for(int i=0;i<producerCount;i++){
-            producers[i] = new Producer(this, itemCount,(char)(i+'A'));
+        for (int i = 0; i < producerCount; i++) {
+            producers[i] = new Producer(this, itemCount, (char) (i + 'A'));
         }
 
-        for(int i=0;i<consumerCount;i++){
+        for (int i = 0; i < consumerCount; i++) {
             consumers[i] = new Consumer(this, sleepDelay);
         }
 
@@ -46,44 +49,76 @@ public class PCAtomics {
         } catch (InterruptedException e) {
             e.printStackTrace();
         }
-        if(print)
+        if (print)
             System.out.println("Finished");
     }
 
-    public void add(Item item) throws InterruptedException {
-
-        items.put(item);
+    /**
+     * Method to add an item to the buffer.
+     *
+     * @param item The item to add.
+     */
+    public void add(Item item) {
+        while (true) {
+            for (int i = 0; i < items.length(); i++) {
+                if (items.compareAndSet(i, null, item)) {
+                    return;
+                }
+            }
+        }
     }
 
-    public Item remove() throws InterruptedException {
-        Item item = null;
-        if(producing||!items.isEmpty())
-            item = items.take();
-        return item;
+    /**
+     * Method to remove an item from the buffer.
+     *
+     * @return The item removed.
+     */
+    public Item remove() {
+        boolean empty = false;
+        Item item;
+        while (producing && !empty) {
+            for (int i = 0; i < items.length(); i++) {
+                if ((item = items.getAndSet(i, null)) != null) {
+                    return item;
+                }
+            }
+            empty = true;
+        }
+        return null;
     }
 
+    /**
+     * Consumer thread
+     */
     private class Consumer extends Thread {
         private PCAtomics controller;
         private long delay;
-        private boolean running;
 
-        public Consumer(PCAtomics controller, long delay){
+        /**
+         * Consumer constructor.
+         *
+         * @param controller The PCAtomics object that manages the system.
+         * @param delay      The consumers delay between consuming items.
+         */
+        public Consumer(PCAtomics controller, long delay) {
             this.controller = controller;
             this.delay = delay;
         }
 
+        /**
+         * Runs the Consumer thread and continues consuming items from the buffer while the system is still running.
+         */
         @Override
         public void run() {
-            running = true;
+            boolean running = true;
             try {
                 while (running) {
                     sleep(delay);
                     Item item = controller.remove();
-                    if(item==null)
+                    if (item == null)
                         running = false;
-                    else
-                    if(print)
-                        System.out.println("Consumed "+item);
+                    else if (print)
+                        System.out.println("Consumed " + item);
                 }
 
             } catch (InterruptedException e) {
@@ -92,29 +127,37 @@ public class PCAtomics {
         }
     }
 
+    /**
+     * Producer thread
+     */
     private class Producer extends Thread {
         private int total, produced;
         private PCAtomics controller;
         private char id;
 
-        public Producer(PCAtomics controller, int totalToMake, char id){
+        /**
+         * Producer constructor.
+         *
+         * @param controller  The PCAtomics object that controls the system.
+         * @param totalToMake The number of items to make.
+         * @param id          The producer's id.
+         */
+        public Producer(PCAtomics controller, int totalToMake, char id) {
             total = totalToMake;
             this.controller = controller;
             this.id = id;
         }
 
+        /**
+         * Runs the producer thread until its made all of the items.
+         */
         @Override
         public void run() {
-            try {
-                while (produced < total){
-                    Item item = new Item(++produced,id);
-                    controller.add(item);
-                    if(print)
-                        System.out.println("Made "+item);
-                }
-
-            } catch (InterruptedException e) {
-                e.printStackTrace();
+            while (produced < total) {
+                Item item = new Item(++produced, id);
+                controller.add(item);
+                if (print)
+                    System.out.println("Made " + item);
             }
         }
     }

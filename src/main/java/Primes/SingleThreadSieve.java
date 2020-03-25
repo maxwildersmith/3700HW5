@@ -1,42 +1,26 @@
 package Primes;
 
-import java.util.Arrays;
-import java.util.function.IntConsumer;
-
 public class SingleThreadSieve {
-    private int maxNum;
-    private int[] numbers;
 
-    //Store vals/just print?
-    public SingleThreadSieve(int maxNum){
-        this.maxNum = maxNum;
-        numbers = new int[maxNum-1];
-        for(int i=0;i<numbers.length;i++)
-            numbers[i]=i+2;
-    }
-
-    public void printNums(){
-        int pi=-1, p;
-        while(pi<numbers.length-1){
-            pi++;
-            p = numbers[pi];
-
-            if(numbers[pi]==-1)
+    /**
+     * The main single threaded method to generate primes up to a certain value.
+     *
+     * @param num The value to generate primes up to.
+     */
+    public static void run(int num) {
+        int[] numbers = new int[num - 2];
+        for (int i = 0; i < numbers.length; i++)
+            numbers[i] = i + 2;
+        for (int i = 0; i < numbers.length; i++) {
+            int prime = numbers[i];
+            if (prime == -1)
                 continue;
-            for(int i=pi+1;i<numbers.length;i++){
-                if(numbers[i]!=-1&&numbers[i]%p==0)
-                    numbers[i]=-1;
+            System.out.print(prime + " ");
+            for (int j = i + 1; j < numbers.length; j++) {
+                if (numbers[j] % prime == 0)
+                    numbers[j] = -1;
             }
         }
-        Arrays.stream(numbers).forEach(i -> {
-            if(i!=-1)
-                System.out.print(i+" ");
-        });
         System.out.println();
-    }
-
-    public static void run(int num){
-        SingleThreadSieve s = new SingleThreadSieve(100);
-        s.printNums();
     }
 }
